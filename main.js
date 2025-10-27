@@ -140,9 +140,8 @@ module.exports = class ExpandSelectionPlugin extends Plugin {
     }
 
     expandToHeadingSection(editor) {
-        const cursor = editor.getCursor();
         const lineCount = editor.lineCount();
-        const currentSelection = editor.listSelections()[0];
+        const selections = editor.listSelections();
 
         // Gather all headings efficiently
         let headings = [];
@@ -159,82 +158,85 @@ module.exports = class ExpandSelectionPlugin extends Plugin {
             return;
         }
 
-        // Determine the effective start position for finding current heading
-        const selectionStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
-        const effectivePosition = selectionStart.line <= cursor.line ? selectionStart : cursor;
+        // Process each selection
+        const expandedSelections = selections.map(currentSelection => {
+            // Determine the effective start position for finding current heading
+            const selectionStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
+            const effectivePosition = selectionStart;
 
-        // Find the nearest heading before the effective position
-        let currentHeading = null;
-        let currentIndex = -1;
-        for (let i = headings.length - 1; i >= 0; i--) {
-            if (headings[i].line <= effectivePosition.line) {
-                currentHeading = headings[i];
-                currentIndex = i;
-                break;
-            }
-        }
-
-        if (!currentHeading) {
-            new Notice("No enclosing section found.");
-            return;
-        }
-
-        // Calculate current section boundaries
-        const start = { line: currentHeading.line, ch: 0 };
-        let endLine = lineCount - 1;
-        for (let i = currentIndex + 1; i < headings.length; i++) {
-            if (headings[i].level <= currentHeading.level) {
-                endLine = Math.max(0, headings[i].line - 1);
-                break;
-            }
-        }
-        const end = { line: endLine, ch: editor.getLine(endLine).length };
-
-        // Check if current selection already contains this entire section
-        const currentStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
-        const currentEnd = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.head : currentSelection.anchor;
-
-        // Check if current selection starts exactly at the current heading line and extends to include the entire section
-        const isCurrentSectionSelected = currentSelection &&
-            currentStart.line === start.line &&
-            currentEnd.line >= end.line;
-
-        if (isCurrentSectionSelected) {
-
-            // Already selected this section, expand to parent
-            let parentHeading = null;
-            let parentIndex = -1;
-
-            // Find the nearest parent heading (higher level = smaller number)
-            for (let i = currentIndex - 1; i >= 0; i--) {
-                if (headings[i].level < currentHeading.level) {
-                    parentHeading = headings[i];
-                    parentIndex = i;
+            // Find the nearest heading before the effective position
+            let currentHeading = null;
+            let currentIndex = -1;
+            for (let i = headings.length - 1; i >= 0; i--) {
+                if (headings[i].line <= effectivePosition.line) {
+                    currentHeading = headings[i];
+                    currentIndex = i;
                     break;
                 }
             }
 
-            if (parentHeading) {
-                // Expand to parent section
-                const parentStart = { line: parentHeading.line, ch: 0 };
-                let parentEndLine = lineCount - 1;
-                for (let i = parentIndex + 1; i < headings.length; i++) {
-                    if (headings[i].level <= parentHeading.level) {
-                        parentEndLine = Math.max(0, headings[i].line - 1);
+            if (!currentHeading) {
+                // No enclosing section found, return original selection
+                return currentSelection;
+            }
+
+            // Calculate current section boundaries
+            const start = { line: currentHeading.line, ch: 0 };
+            let endLine = lineCount - 1;
+            for (let i = currentIndex + 1; i < headings.length; i++) {
+                if (headings[i].level <= currentHeading.level) {
+                    endLine = Math.max(0, headings[i].line - 1);
+                    break;
+                }
+            }
+            const end = { line: endLine, ch: editor.getLine(endLine).length };
+
+            // Check if current selection already contains this entire section
+            const currentStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
+            const currentEnd = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.head : currentSelection.anchor;
+
+            // Check if current selection starts exactly at the current heading line and extends to include the entire section
+            const isCurrentSectionSelected = currentStart.line === start.line &&
+                currentEnd.line >= end.line;
+
+            if (isCurrentSectionSelected) {
+                // Already selected this section, expand to parent
+                let parentHeading = null;
+                let parentIndex = -1;
+
+                // Find the nearest parent heading (higher level = smaller number)
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                    if (headings[i].level < currentHeading.level) {
+                        parentHeading = headings[i];
+                        parentIndex = i;
                         break;
                     }
                 }
-                const parentEnd = { line: parentEndLine, ch: editor.getLine(parentEndLine).length };
-                editor.setSelection(parentStart, parentEnd);
+
+                if (parentHeading) {
+                    // Expand to parent section
+                    const parentStart = { line: parentHeading.line, ch: 0 };
+                    let parentEndLine = lineCount - 1;
+                    for (let i = parentIndex + 1; i < headings.length; i++) {
+                        if (headings[i].level <= parentHeading.level) {
+                            parentEndLine = Math.max(0, headings[i].line - 1);
+                            break;
+                        }
+                    }
+                    const parentEnd = { line: parentEndLine, ch: editor.getLine(parentEndLine).length };
+                    return { anchor: parentStart, head: parentEnd };
+                } else {
+                    // No parent, select entire note
+                    const lastLine = lineCount - 1;
+                    return { anchor: { line: 0, ch: 0 }, head: { line: lastLine, ch: editor.getLine(lastLine).length } };
+                }
             } else {
-                // No parent, select entire note
-                const lastLine = lineCount - 1;
-                editor.setSelection({ line: 0, ch: 0 }, { line: lastLine, ch: editor.getLine(lastLine).length });
+                // Select current section
+                return { anchor: start, head: end };
             }
-        } else {
-            // Select current section
-            editor.setSelection(start, end);
-        }
+        });
+
+        editor.setSelections(expandedSelections);
     }
 
     onunload() {
