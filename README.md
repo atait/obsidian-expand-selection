@@ -1,6 +1,6 @@
 # Expand Selection Obsidian Plugin
 
-An Obsidian plugin to expand your editor selection to lines, sections (recursive), or the entire note
+An Obsidian plugin to expand your editor selection to lines, sections (recursive), or the entire note.
 
 This plugin is primarily designed for *mobile* convenience. "Expand to Section" is useful on desktop as well. Multiple cursors are supported.
 
