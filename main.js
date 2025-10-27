@@ -159,11 +159,15 @@ module.exports = class ExpandSelectionPlugin extends Plugin {
             return;
         }
 
-        // Find the nearest heading before the cursor
+        // Determine the effective start position for finding current heading
+        const selectionStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
+        const effectivePosition = selectionStart.line <= cursor.line ? selectionStart : cursor;
+
+        // Find the nearest heading before the effective position
         let currentHeading = null;
         let currentIndex = -1;
         for (let i = headings.length - 1; i >= 0; i--) {
-            if (headings[i].line <= cursor.line) {
+            if (headings[i].line <= effectivePosition.line) {
                 currentHeading = headings[i];
                 currentIndex = i;
                 break;
@@ -186,12 +190,16 @@ module.exports = class ExpandSelectionPlugin extends Plugin {
         }
         const end = { line: endLine, ch: editor.getLine(endLine).length };
 
-        // Check if current selection already matches this section
-        if (currentSelection &&
-            currentSelection.anchor.line === start.line &&
-            currentSelection.anchor.ch === start.ch &&
-            currentSelection.head.line === end.line &&
-            currentSelection.head.ch === end.ch) {
+        // Check if current selection already contains this entire section
+        const currentStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
+        const currentEnd = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.head : currentSelection.anchor;
+
+        // Check if current selection starts exactly at the current heading line and extends to include the entire section
+        const isCurrentSectionSelected = currentSelection &&
+            currentStart.line === start.line &&
+            currentEnd.line >= end.line;
+
+        if (isCurrentSectionSelected) {
 
             // Already selected this section, expand to parent
             let parentHeading = null;

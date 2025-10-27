@@ -21,4 +21,5 @@ Each mode is exposed as a separate command, so you can assign different hotkeys 
 ---
 
 Author: Alex Tait
+
 License: MIT
