@@ -1,4 +1,4 @@
-const { Plugin, Modal, Notice, FuzzySuggestModal } = require("obsidian");
+const { Plugin, Notice, FuzzySuggestModal } = require("obsidian");
 
 class JumpModal extends FuzzySuggestModal {
     constructor(app, items, instructions = [], onSelect) {
@@ -21,49 +21,8 @@ class JumpModal extends FuzzySuggestModal {
     }
 }
 
-class ExpandSelectionModal extends Modal {
-    constructor(app, onChoose) {
-        super(app);
-        this.onChoose = onChoose;
-        this.buttonElements = [];
-    }
-
-    onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-        contentEl.createEl("h3", { text: "What to expand?" });
-
-        ["Line", "Section", "Note"].forEach((label) => {
-            const btn = contentEl.createEl("button", {
-                text: label,
-                cls: "mod-cta",
-            });
-            btn.style.margin = "6px 0";
-
-            this.buttonClickHandler = () => {
-                this.onChoose(label.toLowerCase());
-                this.close();
-            };
-
-            btn.addEventListener("click", this.buttonClickHandler);
-            this.buttonElements.push(btn);
-        });
-    }
-
-    onClose() {
-        // Clean up event listeners
-        this.buttonElements.forEach(btn => {
-            btn.removeEventListener("click", this.buttonClickHandler);
-        });
-        this.buttonElements = [];
-        this.contentEl.empty();
-    }
-}
-
 module.exports = class ExpandSelectionPlugin extends Plugin {
     onload() {
-        console.log("Expand Selection plugin loaded");
-
         // 🔹 Choose modal using JumpModal
         this.addCommand({
             id: "expand-choose",
@@ -239,7 +198,5 @@ module.exports = class ExpandSelectionPlugin extends Plugin {
         editor.setSelections(expandedSelections);
     }
 
-    onunload() {
-        console.log("Expand Selection plugin unloaded");
-    }
+    onunload() {}
 };
