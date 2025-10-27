@@ -1,0 +1,11 @@
+{
+  "id": "obsidian-expand-selection",
+  "name": "Expand Selection",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Expands the editor selection to full lines, heading sections, or the entire note. Includes a modal chooser.",
+  "author": "Alex Tait",
+  "authorUrl": "",
+  "isDesktopOnly": false,
+  "main": "main.js"
+}
