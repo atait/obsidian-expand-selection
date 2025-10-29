@@ -1,7 +1,7 @@
 {
   "id": "expand-selection",
   "name": "Expand Selection",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "minAppVersion": "0.13.0",
   "description": "Expands the editor selection to lines, sections, or the entire note for convenience on mobile.",
   "author": "Alex Tait",
