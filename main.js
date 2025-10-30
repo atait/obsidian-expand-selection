@@ -183,14 +183,14 @@ class ExpandSelectionPlugin extends Plugin {
             // Select to the end of the line, which includes the newline character
             end = { line: end.line, ch: editor.getLine(end.line).length };
 
-            return { anchor: start, head: end };
+            return { head: start, anchor: end };
         });
         editor.setSelections(expanded);
     }
 
     expandToNote(editor) {
         const lastLine = editor.lineCount() - 1;
-        const selectAll = { anchor: { line: 0, ch: 0 }, head: { line: lastLine, ch: editor.getLine(lastLine).length } };
+        const selectAll = { head: { line: 0, ch: 0 }, anchor: { line: lastLine, ch: editor.getLine(lastLine).length } };
         editor.setSelections([selectAll]);
     }
 
@@ -261,17 +261,17 @@ class ExpandSelectionPlugin extends Plugin {
                     // Expand to parent section
                     const { start: parentStart, end: parentEnd } = this.getSectionBoundaries(editor, parentHeading, parentIndex, headings);
                     selectedLevels.push(parentHeading.level);
-                    return { anchor: parentStart, head: parentEnd };
+                    return { head: parentStart, anchor: parentEnd };
                 } else {
                     // No parent, select entire note
                     const lastLine = lineCount - 1;
                     selectedLevels.push(0);
-                    return { anchor: { line: 0, ch: 0 }, head: { line: lastLine, ch: editor.getLine(lastLine).length } };
+                    return { head: { line: 0, ch: 0 }, anchor: { line: lastLine, ch: editor.getLine(lastLine).length } };
                 }
             } else {
                 // Select current section
                 selectedLevels.push(currentHeading.level);
-                return { anchor: start, head: end };
+                return { head: start, anchor: end };
             }
         });
 
@@ -326,7 +326,7 @@ class SmartExpandPlugin extends ExpandSelectionPlugin {
             start = { line: start.line, ch: 0 };
             end = { line: end.line, ch: editor.getLine(end.line).length };
 
-            return { anchor: start, head: end };
+            return { head: start, anchor: end };
         });
         editor.setSelections(expanded);
     }
