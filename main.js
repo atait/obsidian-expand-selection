@@ -224,6 +224,7 @@ class ExpandSelectionPlugin extends Plugin {
 
             if (!currentHeading) {
                 // No enclosing section found, return original selection
+                selectedLevels.push(null);
                 return currentSelection;
             }
 
@@ -250,25 +251,29 @@ class ExpandSelectionPlugin extends Plugin {
                 if (parentHeading) {
                     // Expand to parent section
                     const { start: parentStart, end: parentEnd } = this.getSectionBoundaries(editor, parentHeading, parentIndex, headings);
+                    selectedLevels.push(parentHeading.level);
                     return { anchor: parentStart, head: parentEnd };
                 } else {
                     // No parent, select entire note
                     const lastLine = lineCount - 1;
+                    selectedLevels.push(0);
                     return { anchor: { line: 0, ch: 0 }, head: { line: lastLine, ch: editor.getLine(lastLine).length } };
                 }
             } else {
                 // Select current section
+                selectedLevels.push(currentHeading.level);
                 return { anchor: start, head: end };
             }
         });
 
         editor.setSelections(expandedSelections);
+        return { levels: selectedLevels };
     }
 
     onunload() {}
 };
 
-class ExpandPlugin2 extends Plugin {
+class SmartExpandPlugin extends Plugin {
     onload() {
         // 🔹 Single smart expand command
         this.addCommand({
@@ -364,7 +369,6 @@ class ExpandPlugin2 extends Plugin {
                     break;
                 }
             }
-
             if (!currentHeading) {
                 // No enclosing section found, return original selection
                 return currentSelection;
@@ -389,7 +393,6 @@ class ExpandPlugin2 extends Plugin {
                         break;
                     }
                 }
-
                 if (parentHeading) {
                     // Expand to parent section
                     const { start: parentStart, end: parentEnd } = this.getSectionBoundaries(editor, parentHeading, parentIndex, headings);
@@ -433,4 +436,4 @@ class ExpandPlugin2 extends Plugin {
     onunload() {}
 }
 
-module.exports = ExpandPlugin2;
+module.exports = SmartExpandPlugin;
