@@ -1,9 +1,9 @@
 {
   "id": "expand-selection",
   "name": "Expand Selection",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "minAppVersion": "0.13.0",
-  "description": "One-button selection of lines, sections, or the entire note. Mobile-friendly.",
+  "description": "Select lines, sections, parents, or note with one button. Stop struggling with mobile selection cursors.",
   "author": "Alex Tait",
   "authorUrl": "https://github.com/atait",
   "isDesktopOnly": false
