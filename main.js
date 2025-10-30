@@ -31,7 +31,7 @@ class ExpandSelectionPlugin extends Plugin {
         // 🔹 Choose modal using JumpModal
         this.addCommand({
             id: "expand-choose",
-            name: "Expand: Choose Line / Section / Note",
+            name: "Modal: Line / Section / Note",
             icon: "move-vertical",
             editorCallback: (editor) => {
                 const opts = new Map([
@@ -51,7 +51,7 @@ class ExpandSelectionPlugin extends Plugin {
         // 🔹 Expand to Line
         this.addCommand({
             id: "expand-line",
-            name: "Expand: Line",
+            name: "Line",
             icon: "text-cursor-input",
             editorCallback: (editor) => {
                 this.expandToLines(editor);
@@ -61,7 +61,7 @@ class ExpandSelectionPlugin extends Plugin {
         // 🔹 Expand to Section
         this.addCommand({
             id: "expand-section",
-            name: "Expand: Section",
+            name: "Section",
             icon: "layout-list",
             editorCallback: (editor) => {
                 this.expandToHeadingSection(editor);
@@ -71,7 +71,7 @@ class ExpandSelectionPlugin extends Plugin {
         // 🔹 Expand to Note
         this.addCommand({
             id: "expand-note",
-            name: "Expand: Note",
+            name: "Note",
             icon: "file-text",
             editorCallback: (editor) => {
                 this.expandToNote(editor);
