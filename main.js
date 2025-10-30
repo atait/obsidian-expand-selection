@@ -112,6 +112,14 @@ class ExpandSelectionPlugin extends Plugin {
         return currentStart.line === start.line && currentEnd.line >= end.line;
     }
 
+    selectionToString(selection) {
+        return `${selection.anchor.line}:${selection.anchor.ch}-${selection.head.line}:${selection.head.ch}`;
+    }
+
+    getSelectionsString(editor) {
+        return editor.listSelections().map(s => this.selectionToString(s)).join("|");
+    }
+
     expandToLines(editor) {
         const selections = editor.listSelections();
 
@@ -160,7 +168,7 @@ class ExpandSelectionPlugin extends Plugin {
         }
 
         if (allLinesSelected || isCurrentSectionSelected) {
-            // If complete lines are already selected, expand to heading section
+            // If complete lines are already selected, expand to heading ection
             this.expandToHeadingSection(editor);
             return;
         }
@@ -206,6 +214,7 @@ class ExpandSelectionPlugin extends Plugin {
         }
 
         // Process each selection
+        const selectedLevels = [];
         const expandedSelections = selections.map(currentSelection => {
             // Determine the effective start position for finding current heading
             const selectionStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
@@ -273,9 +282,9 @@ class ExpandSelectionPlugin extends Plugin {
     onunload() {}
 };
 
-class SmartExpandPlugin extends Plugin {
+class SmartExpandPlugin extends ExpandSelectionPlugin {
     onload() {
-        // 🔹 Single smart expand command
+        // Single smart expand command
         this.addCommand({
             id: "smart-expand",
             name: "Smart Expand",
@@ -284,14 +293,7 @@ class SmartExpandPlugin extends Plugin {
                 this.smartExpand(editor);
             },
         });
-    }
-
-    selectionToString(selection) {
-        return `${selection.anchor.line}:${selection.anchor.ch}-${selection.head.line}:${selection.head.ch}`;
-    }
-
-    getSelectionsString(editor) {
-        return editor.listSelections().map(s => this.selectionToString(s)).join('|');
+        super.onload();
     }
 
     smartExpand(editor) {
@@ -328,112 +330,6 @@ class SmartExpandPlugin extends Plugin {
         });
         editor.setSelections(expanded);
     }
-
-    expandToNote(editor) {
-        const lastLine = editor.lineCount() - 1;
-        const selectAll = { anchor: { line: 0, ch: 0 }, head: { line: lastLine, ch: editor.getLine(lastLine).length } };
-        editor.setSelections([selectAll]);
-    }
-
-    expandToHeadingSection(editor) {
-        const lineCount = editor.lineCount();
-        const selections = editor.listSelections();
-
-        // Gather all headings efficiently
-        let headings = [];
-        for (let i = 0; i < lineCount; i++) {
-            const line = editor.getLine(i);
-            const match = line.match(/^(#{1,6})(?:\s+(.*))?$/);
-            if (match) {
-                headings.push({ line: i, level: match[1].length, text: match[2] || "" });
-            }
-        }
-
-        if (headings.length === 0) {
-            return;
-        }
-
-        // Process each selection
-        const expandedSelections = selections.map(currentSelection => {
-            // Determine the effective start position for finding current heading
-            const selectionStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
-            const effectivePosition = selectionStart;
-
-            // Find the nearest heading before the effective position
-            let currentHeading = null;
-            let currentIndex = -1;
-            for (let i = headings.length - 1; i >= 0; i--) {
-                if (headings[i].line <= effectivePosition.line) {
-                    currentHeading = headings[i];
-                    currentIndex = i;
-                    break;
-                }
-            }
-            if (!currentHeading) {
-                // No enclosing section found, return original selection
-                return currentSelection;
-            }
-
-            // Calculate current section boundaries
-            const { start, end } = this.getSectionBoundaries(editor, currentHeading, currentIndex, headings);
-
-            // Check if current selection already contains this entire section
-            const isCurrentSectionSelected = this.isCompleteSectionSelected(editor, currentSelection, start, end);
-
-            if (isCurrentSectionSelected) {
-                // Already selected this section, expand to parent
-                let parentHeading = null;
-                let parentIndex = -1;
-
-                // Find the nearest parent heading (higher level = smaller number)
-                for (let i = currentIndex - 1; i >= 0; i--) {
-                    if (headings[i].level < currentHeading.level) {
-                        parentHeading = headings[i];
-                        parentIndex = i;
-                        break;
-                    }
-                }
-                if (parentHeading) {
-                    // Expand to parent section
-                    const { start: parentStart, end: parentEnd } = this.getSectionBoundaries(editor, parentHeading, parentIndex, headings);
-                    return { anchor: parentStart, head: parentEnd };
-                } else {
-                    // No parent, select entire note
-                    const lastLine = lineCount - 1;
-                    return { anchor: { line: 0, ch: 0 }, head: { line: lastLine, ch: editor.getLine(lastLine).length } };
-                }
-            } else {
-                // Select current section
-                return { anchor: start, head: end };
-            }
-        });
-
-        editor.setSelections(expandedSelections);
-    }
-
-    // Helper methods
-    getSectionBoundaries(editor, currentHeading, currentIndex, headings) {
-        const lineCount = editor.lineCount();
-        const start = { line: currentHeading.line, ch: 0 };
-        let endLine = lineCount - 1;
-        for (let i = currentIndex + 1; i < headings.length; i++) {
-            if (headings[i].level <= currentHeading.level) {
-                endLine = Math.max(0, headings[i].line - 1);
-                break;
-            }
-        }
-        const end = { line: endLine, ch: editor.getLine(endLine).length };
-        return { start, end };
-    }
-
-    isCompleteSectionSelected(editor, selection, start, end) {
-        const currentStart = selection.anchor.line <= selection.head.line ? selection.anchor : selection.head;
-        const currentEnd = selection.anchor.line <= selection.head.line ? selection.head : selection.anchor;
-
-        return currentStart.line === start.line && currentEnd.line >= end.line;
-    }
-
-    onunload() {}
 }
 
 module.exports = SmartExpandPlugin;
