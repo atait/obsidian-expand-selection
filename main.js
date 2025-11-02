@@ -1,54 +1,47 @@
-const { Plugin, Notice, FuzzySuggestModal } = require("obsidian");
+const { Plugin, Notice } = require("obsidian");
 
-class JumpModal extends FuzzySuggestModal {
-    constructor(app, items, onSelect) {
-        super(app);
-        this.items = items;
-        this.onSelect = onSelect;
-        this.instructions = [
-            { command: "↑↓", purpose: "to navigate" },
-            { command: "↵", purpose: "to choose" },
-            { command: "esc", purpose: "to dismiss" }
-        ];
-        this.setInstructions(this.instructions);
-    }
-
-    getItems() {
-        return Array.from(this.items.keys());
-    }
-
-    getItemText(item) {
-        return item;
-    }
-
-    onChooseItem(item, evt) {
-        this.onSelect(this.items.get(item));
-    }
-}
+// Developer switch: Set to true to include newline terminators in selections
+const includeTerminators = true;
 
 class ExpandSelectionPlugin extends Plugin {
-    onload() {
-        // 🔹 Choose modal using JumpModal
-        this.addCommand({
-            id: "expand-choose",
-            name: "Modal: Line / Section / Note",
-            icon: "move-vertical",
-            editorCallback: (editor) => {
-                const opts = new Map([
-                    ["Expand to Line", "line"],
-                    ["Expand to Section", "section"],
-                    ["Expand to Note", "note"]
-                ]);
+    getEndCharPosition(editor, lineNumber) {
+        const lineContent = editor.getLine(lineNumber);
+        const lastLine = editor.lineCount() - 1;
 
-                new JumpModal(this.app, opts, (choice) => {
-                    if (choice === "line") this.expandToLines(editor);
-                    else if (choice === "section") this.expandToHeadingSection(editor);
-                    else if (choice === "note") this.expandToNote(editor);
-                }).open();
+        if (includeTerminators && lineNumber !== lastLine) {
+            // Include newline character for all lines except the last line
+            return lineContent.length + 1;
+        } else {
+            // Don't include newline (old behavior or last line)
+            return lineContent.length;
+        }
+    }
+
+    onload() {
+        // Smart expand by sections: line → section → parent → note
+        this.addCommand({
+            id: "smart-expand-section",
+            name: "Smart Expand (Section)",
+            icon: "layout-list",
+            editorCallback: (editor) => {
+                this.expandToHeadingSection(editor);
             },
         });
 
-        // 🔹 Expand to Line
+        // Smart expand by lines: line → next line → next line → etc
+        this.addCommand({
+            id: "smart-expand-lines",
+            name: "Smart Expand (Lines)",
+            icon: "text-cursor-input",
+            editorCallback: (editor) => {
+                this.smartExpandLines(editor);
+            },
+        });
+
+        super.onload();
+
+        /* To deprecate
+        // Expand to Line
         this.addCommand({
             id: "expand-line",
             name: "Line",
@@ -58,7 +51,7 @@ class ExpandSelectionPlugin extends Plugin {
             },
         });
 
-        // 🔹 Expand to Section
+        // Expand to Section
         this.addCommand({
             id: "expand-section",
             name: "Section",
@@ -67,25 +60,15 @@ class ExpandSelectionPlugin extends Plugin {
                 this.expandToHeadingSection(editor);
             },
         });
-
-        // 🔹 Expand to Note
-        this.addCommand({
-            id: "expand-note",
-            name: "Note",
-            icon: "file-text",
-            editorCallback: (editor) => {
-                this.expandToNote(editor);
-            },
-        });
+        */
     }
 
     isCompleteLineSelected(editor, selection) {
         let start = selection.anchor.line <= selection.head.line ? selection.anchor : selection.head;
         let end = selection.anchor.line <= selection.head.line ? selection.head : selection.anchor;
 
-        const lineContent = editor.getLine(start.line);
         const isStartAtLineStart = start.ch === 0;
-        const isEndAtLineEnd = end.ch === lineContent.length;
+        const isEndAtLineEnd = end.ch === this.getEndCharPosition(editor, end.line);
         const isSingleLine = start.line === end.line;
 
         return isSingleLine && isStartAtLineStart && isEndAtLineEnd;
@@ -101,7 +84,8 @@ class ExpandSelectionPlugin extends Plugin {
                 break;
             }
         }
-        const end = { line: endLine, ch: editor.getLine(endLine).length };
+
+        const end = { line: endLine, ch: this.getEndCharPosition(editor, endLine) };
         return { start, end };
     }
 
@@ -122,66 +106,12 @@ class ExpandSelectionPlugin extends Plugin {
 
     expandToLines(editor) {
         const selections = editor.listSelections();
-
-        // Check if all selections are already complete lines
-        const allLinesSelected = selections.every(selection =>
-            this.isCompleteLineSelected(editor, selection)
-        );
-
-        // If complete lines are selected, check if they form complete sections
-        let isCurrentSectionSelected = false;
-        if (allLinesSelected) {
-            // Get headings to check section boundaries
-            const lineCount = editor.lineCount();
-            let headings = [];
-            for (let i = 0; i < lineCount; i++) {
-                const line = editor.getLine(i);
-                const match = line.match(/^(#{1,6})(?:\s+(.*))?$/);
-                if (match) {
-                    headings.push({ line: i, level: match[1].length, text: match[2] || "" });
-                }
-            }
-
-            if (headings.length > 0) {
-                // Check if all selections are complete sections
-                isCurrentSectionSelected = selections.every(selection => {
-                    const selectionStart = selection.anchor.line <= selection.head.line ? selection.anchor : selection.head;
-
-                    // Find the nearest heading before the selection
-                    let currentHeading = null;
-                    let currentIndex = -1;
-                    for (let i = headings.length - 1; i >= 0; i--) {
-                        if (headings[i].line <= selectionStart.line) {
-                            currentHeading = headings[i];
-                            currentIndex = i;
-                            break;
-                        }
-                    }
-
-                    if (currentHeading) {
-                        const { start, end } = this.getSectionBoundaries(editor, currentHeading, currentIndex, headings);
-                        return this.isCompleteSectionSelected(editor, selection, start, end);
-                    }
-                    return false;
-                });
-            }
-        }
-
-        if (allLinesSelected || isCurrentSectionSelected) {
-            // If complete lines are already selected, expand to heading ection
-            this.expandToHeadingSection(editor);
-            return;
-        }
-
-        // Otherwise, expand to complete lines including the newline
         const expanded = selections.map(({ anchor, head }) => {
             let start = anchor.line <= head.line ? anchor : head;
             let end = anchor.line <= head.line ? head : anchor;
 
             start = { line: start.line, ch: 0 };
-
-            // Select to the end of the line, which includes the newline character
-            end = { line: end.line, ch: editor.getLine(end.line).length };
+            end = { line: end.line, ch: this.getEndCharPosition(editor, end.line) };
 
             return { head: start, anchor: end };
         });
@@ -190,7 +120,7 @@ class ExpandSelectionPlugin extends Plugin {
 
     expandToNote(editor) {
         const lastLine = editor.lineCount() - 1;
-        const selectAll = { head: { line: 0, ch: 0 }, anchor: { line: lastLine, ch: editor.getLine(lastLine).length } };
+        const selectAll = { head: { line: 0, ch: 0 }, anchor: { line: lastLine, ch: this.getEndCharPosition(editor, lastLine) } };
         editor.setSelections([selectAll]);
     }
 
@@ -266,7 +196,7 @@ class ExpandSelectionPlugin extends Plugin {
                     // No parent, select entire note
                     const lastLine = lineCount - 1;
                     selectedLevels.push(0);
-                    return { head: { line: 0, ch: 0 }, anchor: { line: lastLine, ch: editor.getLine(lastLine).length } };
+                    return { head: { line: 0, ch: 0 }, anchor: { line: lastLine, ch: this.getEndCharPosition(editor, lastLine) } };
                 }
             } else {
                 // Select current section
@@ -280,23 +210,8 @@ class ExpandSelectionPlugin extends Plugin {
     }
 
     onunload() {}
-};
 
-class SmartExpandPlugin extends ExpandSelectionPlugin {
-    onload() {
-        // Single smart expand command
-        this.addCommand({
-            id: "smart-expand",
-            name: "Smart Expand",
-            icon: "expand",
-            editorCallback: (editor) => {
-                this.smartExpand(editor);
-            },
-        });
-        super.onload();
-    }
-
-    smartExpand(editor) {
+    smartExpandSection(editor) {
         const beforeSelection = this.getSelectionsString(editor);
 
         // Try expanding to lines first
@@ -305,31 +220,48 @@ class SmartExpandPlugin extends ExpandSelectionPlugin {
         // Check if selection changed
         const afterLinesSelection = this.getSelectionsString(editor);
         if (beforeSelection === afterLinesSelection) {
-            // Lines didn't change, try expanding to section
+            // Lines didn't change, try expanding to section (which handles parent → note automatically)
             this.expandToHeadingSection(editor);
-
-            // Check if section expansion changed anything
-            const afterSectionSelection = this.getSelectionsString(editor);
-            if (afterLinesSelection === afterSectionSelection) {
-                // Section didn't change either, try expanding to note
-                this.expandToNote(editor);
-            }
         }
     }
 
-    expandToLines(editor) {
+    smartExpandLines(editor) {
+        const beforeSelection = this.getSelectionsString(editor);
+
+        // Try expanding to lines first
+        this.expandToLines(editor);
+
+        // Check if selection changed
+        const afterLinesSelection = this.getSelectionsString(editor);
+        if (beforeSelection === afterLinesSelection) {
+            // Already at line boundaries, try adding next line
+            this.expandToNextLine(editor);
+        }
+    }
+
+    expandToNextLine(editor) {
         const selections = editor.listSelections();
         const expanded = selections.map(({ anchor, head }) => {
             let start = anchor.line <= head.line ? anchor : head;
             let end = anchor.line <= head.line ? head : anchor;
 
-            start = { line: start.line, ch: 0 };
-            end = { line: end.line, ch: editor.getLine(end.line).length };
-
-            return { head: start, anchor: end };
+            // If we're already at line boundaries, extend by one line
+            if (start.ch === 0 && end.ch === this.getEndCharPosition(editor, end.line)) {
+                const nextLine = Math.min(end.line + 1, editor.lineCount() - 1);
+                // Head at end of selection (start), anchor at beginning of next line
+                start = { line: start.line, ch: 0 };
+                end = { line: nextLine, ch: this.getEndCharPosition(editor, nextLine) };
+                return { head: end, anchor: start };
+            } else {
+                // Not at line boundaries, expand to current lines
+                start = { line: start.line, ch: 0 };
+                end = { line: end.line, ch: this.getEndCharPosition(editor, end.line) };
+                return { head: start, anchor: end };
+            }
         });
         editor.setSelections(expanded);
     }
-}
 
-module.exports = SmartExpandPlugin;
+    };
+
+module.exports = ExpandSelectionPlugin;
