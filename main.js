@@ -1,31 +1,14 @@
-const { Plugin, Notice } = require("obsidian");
-
-// Developer switch: Set to true to include newline terminators in selections
-const includeTerminators = false;
+const { Plugin } = require("obsidian");
 
 class ExpandSelectionPlugin extends Plugin {
-
-    getEndCharPosition(editor, lineNumber) {
-        const lineContent = editor.getLine(lineNumber);
-        const lastLine = editor.lineCount() - 1;
-
-        if (includeTerminators && lineNumber !== lastLine) {
-            // Include newline character for all lines except the last line
-            return lineContent.length + 1;
-        } else {
-            // Don't include newline (old behavior or last line)
-            return lineContent.length;
-        }
-    }
-
     onload() {
         // Smart expand by sections: line → section → parent → note
         this.addCommand({
             id: "smart-expand-section",
             name: "Hierarchical Expand (Section)",
-            icon: "layout-list",
+            icon: "text-select",
             editorCallback: (editor) => {
-                this.expandToHeadingSection_Lazy(editor);
+                this.expandToHeadingSection(editor);
             },
         });
 
@@ -42,6 +25,16 @@ class ExpandSelectionPlugin extends Plugin {
         super.onload();
     }
 
+    /**
+     * Gets the character position at the end of a line (excluding newline)
+     * @param {Editor} editor - The CodeMirror editor instance
+     * @param {number} lineNumber - The line number
+     * @returns {number} The character position at the end of the line
+     */
+    getEndCharPosition(editor, lineNumber) {
+        return editor.getLine(lineNumber).length;
+    }
+
     // Helper methods
 
     getHeadings(editor) {
@@ -55,24 +48,6 @@ class ExpandSelectionPlugin extends Plugin {
             }
         }
         return headings;
-    }
-
-    isCompleteLineSelected(editor, selection) {
-        let start = selection.anchor.line <= selection.head.line ? selection.anchor : selection.head;
-        let end = selection.anchor.line <= selection.head.line ? selection.head : selection.anchor;
-
-        const isStartAtLineStart = start.ch === 0;
-        const isEndAtLineEnd = end.ch === this.getEndCharPosition(editor, end.line);
-        const isSingleLine = start.line === end.line;
-
-        return isSingleLine && isStartAtLineStart && isEndAtLineEnd;
-    }
-
-    isCompleteSectionSelected(editor, selection, start, end) {
-        const currentStart = selection.anchor.line <= selection.head.line ? selection.anchor : selection.head;
-        const currentEnd = selection.anchor.line <= selection.head.line ? selection.head : selection.anchor;
-
-        return currentStart.line === start.line && currentEnd.line >= end.line;
     }
 
     selectionToString(selection) {
@@ -165,131 +140,13 @@ class ExpandSelectionPlugin extends Plugin {
         editor.setSelections([selectAll]);
     }
 
-    expandToHeadingSection_Eager(editor) {
-        /**
-         * Expands the selection to the section the cursor or selection is in.
-         * If the full section is already selected, expands to the parent section.
-         * If before the first heading, expands to full note.
-         *
-         * Eager: Expansion logic is based on calculations of lines and cursor positions
-         * Lazy: Logic is based on comparing selection before/after expansion
-         */
-        const lineCount = editor.lineCount();
-        const selections = editor.listSelections();
-
-        // Gather all headings efficiently
-        let headings = [];
-        for (let i = 0; i < lineCount; i++) {
-            const line = editor.getLine(i);
-            const match = line.match(/^(#{1,6})(?:\s+(.*))?$/);
-            if (match) {
-                headings.push({ line: i, level: match[1].length, text: match[2] || "" });
-            }
-        }
-
-        if (headings.length === 0) {
-            // No headings, select entire note
-            this.expandToNote(editor);
-            return { levels: [0] };
-        }
-
-        // Process each selection
-        const selectedLevels = [];
-        const expandedSelections = selections.map(currentSelection => {
-            // Determine the effective start position for finding current heading
-            const selectionStart = currentSelection.anchor.line <= currentSelection.head.line ? currentSelection.anchor : currentSelection.head;
-            const effectivePosition = selectionStart;
-
-            // Find the nearest heading before the effective position
-            let currentHeading = null;
-            let currentIndex = -1;
-            for (let i = headings.length - 1; i >= 0; i--) {
-                if (headings[i].line <= effectivePosition.line) {
-                    currentHeading = headings[i];
-                    currentIndex = i;
-                    break;
-                }
-            }
-
-            if (!currentHeading) {
-                // Cursor is above first heading, select everything before first heading
-                const firstHeading = headings[0];
-                const endLine = Math.max(0, firstHeading.line - 1);
-                // Find line after YAML frontmatter
-                let startLine = 0;
-                const firstLine = editor.getLine(0);
-                if (firstLine.startsWith('---')) {
-                    for (let i = 1; i < lineCount; i++) {
-                        if (editor.getLine(i).startsWith('---')) {
-                            startLine = i + 1;
-                            break;
-                        }
-                    }
-                }
-                const start = { line: startLine, ch: 0 };
-                let end = { line: endLine, ch: this.getEndCharPosition(editor, endLine) };
-
-                // Check if current selection includes all pre-heading text
-                let currentStart = currentSelection.head;
-                let currentEnd = currentSelection.anchor;
-                if (currentSelection.anchor.line <= currentSelection.head.line) {
-                    currentStart = currentSelection.anchor;
-                    currentEnd = currentSelection.head;
-                }
-                if (currentStart.line === start.line && currentStart.ch === start.ch &&
-                    (currentEnd.line === end.line && currentEnd.ch === end.ch ||
-                        currentEnd.line === end.line + 1 && currentEnd.ch === 0
-                    )) {
-                    // All pre-heading text is selected, expand to entire note
-                    end = { line: lineCount - 1, ch: this.getEndCharPosition(editor, lineCount - 1) };
-                }
-                selectedLevels.push(firstHeading.level + 1); // Virtual level for content before first heading
-                return { head: start, anchor: end };
-            }
-
-            // Calculate current section boundaries
-            const { start, end } = this.getSectionBoundaries(editor, currentHeading, currentIndex, headings);
-
-            // Check if current selection already contains this entire section
-            const isCurrentSectionSelected = this.isCompleteSectionSelected(editor, currentSelection, start, end);
-
-            if (isCurrentSectionSelected) {
-                // Already selected this section, expand to parent
-                let parentHeading = null;
-                let parentIndex = -1;
-
-                // Find the nearest parent heading (higher level = smaller number)
-                for (let i = currentIndex - 1; i >= 0; i--) {
-                    if (headings[i].level < currentHeading.level) {
-                        parentHeading = headings[i];
-                        parentIndex = i;
-                        break;
-                    }
-                }
-
-                if (parentHeading) {
-                    // Expand to parent section
-                    const { start: parentStart, end: parentEnd } = this.getSectionBoundaries(editor, parentHeading, parentIndex, headings);
-                    selectedLevels.push(parentHeading.level);
-                    return { head: parentStart, anchor: parentEnd };
-                } else {
-                    // No parent, select entire note
-                    const lastLine = lineCount - 1;
-                    selectedLevels.push(0);
-                    return { head: { line: 0, ch: 0 }, anchor: { line: lastLine, ch: this.getEndCharPosition(editor, lastLine) } };
-                }
-            } else {
-                // Select current section
-                selectedLevels.push(currentHeading.level);
-                return { head: start, anchor: end };
-            }
-        });
-
-        editor.setSelections(expandedSelections);
-        return { levels: selectedLevels };
-    }
-
-    expandToHeadingSection_Lazy(editor) {
+    /**
+     * Main hierarchical expansion method using lazy evaluation
+     * Progresses through: lines → current section → parent section → entire note
+     * Uses before/after comparison to determine when to advance to next level
+     * @param {Editor} editor - The CodeMirror editor instance
+     */
+    expandToHeadingSection(editor) {
         const beforeSelection = this.getSelectionsString(editor);
 
         // Try expanding to lines first
