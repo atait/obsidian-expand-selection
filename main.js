@@ -8,7 +8,7 @@ class ExpandSelectionPlugin extends Plugin {
             name: "Hierarchical Expand (Section)",
             icon: "text-select",
             editorCallback: (editor) => {
-                this.expandToHeadingSection(editor);
+                this.smartExpandSection(editor);
             },
         });
 
@@ -129,7 +129,7 @@ class ExpandSelectionPlugin extends Plugin {
                 end = { line: nextLine, ch: this.getEndCharPosition(editor, nextLine) };
             }
 
-            return { head: start, anchor: end };
+            return { anchor: start, head: end };
         });
         editor.setSelections(expanded);
     }
@@ -138,38 +138,6 @@ class ExpandSelectionPlugin extends Plugin {
         const { start, end } = this.getNoteBoundaries(editor);
         const selectAll = { head: start, anchor: end };
         editor.setSelections([selectAll]);
-    }
-
-    /**
-     * Main hierarchical expansion method using lazy evaluation
-     * Progresses through: lines → current section → parent section → entire note
-     * Uses before/after comparison to determine when to advance to next level
-     * @param {Editor} editor - The CodeMirror editor instance
-     */
-    expandToHeadingSection(editor) {
-        const beforeSelection = this.getSelectionsString(editor);
-
-        // Try expanding to lines first
-        this.expandLines(editor);
-        // Check if selection changed
-        if (beforeSelection !== this.getSelectionsString(editor)) {
-            return;
-        }
-
-        // Lines didn't change, try expanding to section
-        this.expandToCurrentSection(editor);
-        // Check if section expansion changed anything
-        if (beforeSelection !== this.getSelectionsString(editor)) {
-            return;
-        }
-
-        this.expandToParentSection(editor);
-        // Check if parent expansion changed anything
-        if (beforeSelection !== this.getSelectionsString(editor)) {
-            return;
-        }
-
-        this.expandToNote(editor);
     }
 
     findCurrentHeading(editor, currentSelection, headings) {
@@ -257,11 +225,43 @@ class ExpandSelectionPlugin extends Plugin {
         editor.setSelections(expandedSelections);
     }
 
-    smartExpandLines(editor) {
+    /**
+     * Main hierarchical expansion method using lazy evaluation
+     * Progresses through: lines → current section → parent section → entire note
+     * Uses before/after comparison to determine when to advance to next level
+     * @param {Editor} editor - The CodeMirror editor instance
+     */
+    smartExpandSection(editor) {
         const beforeSelection = this.getSelectionsString(editor);
 
         // Try expanding to lines first
         this.expandLines(editor);
+        // Check if selection changed
+        if (beforeSelection !== this.getSelectionsString(editor)) {
+            return;
+        }
+
+        // Lines didn't change, try expanding to section
+        this.expandToCurrentSection(editor);
+        // Check if section expansion changed anything
+        if (beforeSelection !== this.getSelectionsString(editor)) {
+            return;
+        }
+
+        this.expandToParentSection(editor);
+        // Check if parent expansion changed anything
+        if (beforeSelection !== this.getSelectionsString(editor)) {
+            return;
+        }
+
+        this.expandToNote(editor);
+    }
+
+    smartExpandLines(editor) {
+        const beforeSelection = this.getSelectionsString(editor);
+
+        // Try expanding to lines first
+        this.expandLines(editor, false);
 
         // Check if selection changed
         if (beforeSelection !== this.getSelectionsString(editor)) {
