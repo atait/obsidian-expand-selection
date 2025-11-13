@@ -1,25 +1,24 @@
 # Expand Selection Obsidian Plugin
 
-An Obsidian plugin to expand your editor selection to lines, sections (recursive), or the entire note.
+An Obsidian plugin designed to simplify section selection with a single hotkey. This plugin is especially useful for mobile users who struggle with precise cursor control.
 
-This plugin is primarily designed for *mobile* convenience. "Expand to Section" is useful on desktop as well. Multiple cursors are supported.
+## Features
 
-## Expand to Section
-Run this command to select the entire section the cursor is in or that the current selection is in. Run the command again to expand to the parent section.
+### Expand to Section (Shift-Cmd-L)
+- **Single Command**: Quickly select the entire section your cursor is in. Repeatedly pressing the hotkey will expand the selection to parent sections and eventually the entire note.
+- **Mobile Convenience**: Designed to overcome the challenges of mobile interfaces where cursors can be difficult to control.
 
+### Integration with Code Shortcuts
+- **Line Selection**: For line-by-line selection, use the `Code Shortcuts` plugin with the hotkey `Cmd-L`.
 
-![Expand to Section](https://github.com/atait/obsidian-expand-selection/raw/main/assets/expand-selection-demo.gif)
+## Why This Plugin?
 
+### Mobile Interface Challenges
+- **Cursor Control**: On mobile, grabbing a cursor can cause it to move off-screen, making it hard to track the selection.
+- **Visibility Issues**: It's often difficult to see where the top of the cursor is, leading to inaccurate selections.
+- **Efficiency**: Simplifies the selection process, reducing the need for precise cursor adjustments.
 
-This feature is useful when you want to perform operations on an entire section at once, such as reformatting, copying, or moving to a different place in your vault.
-
-## Smart Expand
-This single command replaces the need for the others.
-
-- Smart Expand is line expansion by default.
-- If the selection is already a line, it expands to the section.
-- If the selection is already a section, it expands to the parent.
-- Eventually, it will expand to the note.
+This plugin is ideal for users who want to streamline their selection process, especially on mobile devices where traditional selection methods can be cumbersome.
 
 ## Registered Commands
 

@@ -2,32 +2,40 @@ const { Plugin } = require("obsidian");
 
 class ExpandSelectionPlugin extends Plugin {
     onload() {
-        // Hierarchical section expand: section → parent section → entire note
+        // Smart expand by sections: line → section → parent → note
         this.addCommand({
-            id: "expand-section",
-            name: "Expand Section",
+            id: "smart-expand-section",
+            name: "Hierarchical Expand (Section)",
             icon: "text-select",
             editorCallback: (editor) => {
-                this.expandSection(editor);
+                this.smartExpandSection(editor);
+            },
+        });
+
+        // Smart expand by lines: line → next line → next line → etc
+        this.addCommand({
+            id: "smart-expand-lines",
+            name: "Series Expand (Lines)",
+            icon: "text-cursor-input",
+            editorCallback: (editor) => {
+                this.smartExpandLines(editor);
             },
         });
 
         super.onload();
     }
 
-    // Helper methods
-
+    /**
+     * Gets the character position at the end of a line (excluding newline)
+     * @param {Editor} editor - The CodeMirror editor instance
+     * @param {number} lineNumber - The line number
+     * @returns {number} The character position at the end of the line
+     */
     getEndCharPosition(editor, lineNumber) {
         return editor.getLine(lineNumber).length;
     }
 
-    selectionToString(selection) {
-        return `${selection.anchor.line}:${selection.anchor.ch}-${selection.head.line}:${selection.head.ch}`;
-    }
-
-    getSelectionsString(editor) {
-        return editor.listSelections().map(s => this.selectionToString(s)).join("|");
-    }
+    // Helper methods
 
     getHeadings(editor) {
         const lineCount = editor.lineCount();
@@ -42,6 +50,13 @@ class ExpandSelectionPlugin extends Plugin {
         return headings;
     }
 
+    selectionToString(selection) {
+        return `${selection.anchor.line}:${selection.anchor.ch}-${selection.head.line}:${selection.head.ch}`;
+    }
+
+    getSelectionsString(editor) {
+        return editor.listSelections().map(s => this.selectionToString(s)).join("|");
+    }
 
     getNoteStartline(editor) {
         // Find line after YAML frontmatter
@@ -97,6 +112,27 @@ class ExpandSelectionPlugin extends Plugin {
         return { start, end };
     }
 
+    // Expansion methods (with side effects)
+
+    expandLines(editor, extendByOne = false) {
+        const selections = editor.listSelections();
+        const expanded = selections.map(({ anchor, head }) => {
+            let start = anchor.line <= head.line ? anchor : head;
+            let end = anchor.line <= head.line ? head : anchor;
+
+            start = { line: start.line, ch: 0 };
+            end = { line: end.line, ch: this.getEndCharPosition(editor, end.line) };
+
+            // If extendByOne is true and we're already at line boundaries, extend by one line
+            if (extendByOne && start.ch === 0 && end.ch === this.getEndCharPosition(editor, end.line)) {
+                const nextLine = Math.min(end.line + 1, editor.lineCount() - 1);
+                end = { line: nextLine, ch: this.getEndCharPosition(editor, nextLine) };
+            }
+
+            return { anchor: start, head: end };
+        });
+        editor.setSelections(expanded);
+    }
 
     expandToNote(editor) {
         const { start, end } = this.getNoteBoundaries(editor);
@@ -141,6 +177,7 @@ class ExpandSelectionPlugin extends Plugin {
                 return { head: start, anchor: end };
             }
         });
+        console.log(expandedSelections);
 
         editor.setSelections(expandedSelections);
     }
@@ -189,30 +226,52 @@ class ExpandSelectionPlugin extends Plugin {
     }
 
     /**
-     * Main hierarchical expansion method
-     * Progresses through: current section → parent section → entire note
+     * Main hierarchical expansion method using lazy evaluation
+     * Progresses through: lines → current section → parent section → entire note
+     * Uses before/after comparison to determine when to advance to next level
      * @param {Editor} editor - The CodeMirror editor instance
      */
-    expandSection(editor) {
+    smartExpandSection(editor) {
         const beforeSelection = this.getSelectionsString(editor);
 
-        // Try expanding to current section
+        // Try expanding to lines first
+        this.expandLines(editor);
+        // Check if selection changed
+        if (beforeSelection !== this.getSelectionsString(editor)) {
+            return;
+        }
+
+        // Lines didn't change, try expanding to section
         this.expandToCurrentSection(editor);
+        // Check if section expansion changed anything
         if (beforeSelection !== this.getSelectionsString(editor)) {
             return;
         }
 
-        // Try expanding to parent section
         this.expandToParentSection(editor);
+        // Check if parent expansion changed anything
         if (beforeSelection !== this.getSelectionsString(editor)) {
             return;
         }
 
-        // Finally expand to entire note
         this.expandToNote(editor);
     }
 
+    smartExpandLines(editor) {
+        const beforeSelection = this.getSelectionsString(editor);
+
+        // Try expanding to lines first
+        this.expandLines(editor, false);
+
+        // Check if selection changed
+        if (beforeSelection !== this.getSelectionsString(editor)) {
+            return;
+        }
+        // Already at line boundaries, try adding next line
+        this.expandLines(editor, true);
+    }
+
     onunload() {}
-}
+    }
 
 module.exports = ExpandSelectionPlugin;
