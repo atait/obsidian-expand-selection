@@ -29,16 +29,17 @@ class ExpandSelectionPlugin extends Plugin {
     }
 
     getHeadings(editor) {
-        const lineCount = editor.lineCount();
-        let headings = [];
-        for (let i = 0; i < lineCount; i++) {
-            const line = editor.getLine(i);
-            const match = line.match(/^(#{1,6})(?:\s+(.*))?$/);
-            if (match) {
-                headings.push({ line: i, level: match[1].length, text: match[2] || "" });
-            }
-        }
-        return headings;
+        const file = this.app.workspace.getActiveFile();
+        if (!file) return [];
+
+        const cache = this.app.metadataCache.getFileCache(file);
+        if (!cache || !cache.headings) return [];
+
+        return cache.headings.map(heading => ({
+            line: heading.position.start.line,
+            level: heading.level,
+            text: heading.heading || ""
+        }));
     }
 
 
