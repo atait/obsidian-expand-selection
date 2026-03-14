@@ -1,4 +1,4 @@
-# Expand Selection Obsidian Plugin
+# Expand Selection for Obsidian
 
 An Obsidian plugin designed to simplify section selection with a single hotkey. This plugin is especially useful for mobile users who struggle with precise cursor control.
 
@@ -11,8 +11,6 @@ An Obsidian plugin designed to simplify section selection with a single hotkey. 
 ### Integration with Code Shortcuts
 - **Line Selection**: For line-by-line selection, use the `Code Shortcuts` plugin with the hotkey `Cmd-L`.
 
-## Why This Plugin?
-
 ### Mobile Interface Challenges
 - **Cursor Control**: On mobile, grabbing a cursor can cause it to move off-screen, making it hard to track the selection.
 - **Visibility Issues**: It's often difficult to see where the top of the cursor is, leading to inaccurate selections.
@@ -20,15 +18,9 @@ An Obsidian plugin designed to simplify section selection with a single hotkey. 
 
 This plugin is ideal for users who want to streamline their selection process, especially on mobile devices where traditional selection methods can be cumbersome.
 
-## Registered Commands
+### Registered Commands
 
-Each mode is exposed as a separate command, so you can assign different hotkeys and add them to your mobile toolbar.
-
-- `Expand Selection: Line`
-- `Expand Selection: Section`
-- `Expand Selection: Note`
-- `Expand Selection: Modal`
-- `Expand Selection: Smart Expand`
+- `Expand section`
 
 ---
 

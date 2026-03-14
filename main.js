@@ -2,13 +2,12 @@ const { Plugin } = require("obsidian");
 
 class ExpandSelectionPlugin extends Plugin {
     onload() {
-        // Hierarchical section expand: section → parent section → entire note
         this.addCommand({
-            id: "expand-section",
-            name: "Expand Section",
+            id: "smart-expand-section",
+            name: "Expand section",
             icon: "text-select",
             editorCallback: (editor) => {
-                this.expandSection(editor);
+                this.smartExpandSection(editor);
             },
         });
 
@@ -22,7 +21,7 @@ class ExpandSelectionPlugin extends Plugin {
     }
 
     selectionToString(selection) {
-        return `${selection.anchor.line}:${selection.anchor.ch}-${selection.head.line}:${selection.head.ch}`;
+        return selection.anchor.line + ":" + selection.anchor.ch + "-" + selection.head.line + ":" + selection.head.ch;
     }
 
     getSelectionsString(editor) {
@@ -188,12 +187,7 @@ class ExpandSelectionPlugin extends Plugin {
         editor.setSelections(expandedSelections);
     }
 
-    /**
-     * Main hierarchical expansion method
-     * Progresses through: current section → parent section → entire note
-     * @param {Editor} editor - The CodeMirror editor instance
-     */
-    expandSection(editor) {
+    smartExpandSection(editor) {
         const beforeSelection = this.getSelectionsString(editor);
 
         // Try expanding to current section
